@@ -29,5 +29,5 @@ jobs:
           fi
 
           # Proceed with your deployment
-          cd /home/ubuntu/pearlThoughts
+          cd /home/ubuntu/pearlThoughts/ansible
           ansible-playbook -i inventory.ini playbook.yml
