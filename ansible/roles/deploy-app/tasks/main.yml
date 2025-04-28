@@ -1,0 +1,16 @@
+- name: Pull latest Docker image
+  shell: docker pull {{ docker_image }}
+
+- name: Check if service exists
+  shell: docker service ls --filter name={{ service_name }} --format "{{'{{.Name}}'}}"
+  register: service_exists
+  failed_when: false
+
+- name: Update Docker service if exists
+  shell: docker service update --image {{ docker_image }} {{ service_name }}
+  when: service_exists.stdout != ""
+
+- name: Create Docker service if not exists
+  shell: docker service create --name {{ service_name }} --publish published=9000,target=9000 {{ docker_image }}
+  when: service_exists.stdout == ""
+

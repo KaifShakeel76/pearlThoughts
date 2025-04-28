@@ -1,0 +1,39 @@
+- name: Install NGINX
+  apt:
+    name: nginx
+    state: present
+    update_cache: yes
+
+- name: Start and enable NGINX
+  service:
+    name: nginx
+    state: started
+    enabled: yes
+
+- name: Copy NGINX site config
+  template:
+    src: yii2.conf.j2
+    dest: /etc/nginx/sites-available/yii2.conf
+
+- name: Enable NGINX site
+  file:
+    src: /etc/nginx/sites-available/yii2.conf
+    dest: /etc/nginx/sites-enabled/yii2.conf
+    state: link
+    force: yes
+
+- name: Remove default NGINX site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+
+- name: Test NGINX config
+  shell: nginx -t
+  register: nginx_test
+  failed_when: "'successful' not in nginx_test.stdout"
+
+- name: Reload NGINX
+  service:
+    name: nginx
+    state: reloaded
+
