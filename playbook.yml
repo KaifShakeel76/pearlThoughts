@@ -60,6 +60,10 @@
       until: mysql_ready.rc == 0
       ignore_errors: false
 
+    - name: Sleep 10 seconds
+      pause:
+        seconds: 10
+
     - name: Run migrations
       shell: docker-compose run --rm backend yii migrate --interactive=0
       args:
