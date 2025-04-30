@@ -29,5 +29,4 @@ jobs:
           fi
 
           # Proceed with your deployment
-          cd /home/ubuntu/project
-          ansible-playbook playbook.yml
+          ansible-playbook /home/ubuntu/project/playbook.yml
