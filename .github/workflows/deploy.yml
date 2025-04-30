@@ -1,0 +1,33 @@
+name: Deploy Yii2 App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: SSH and Run Ansible
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        script: |
+          if ! command -v ansible &> /dev/null
+          then
+            echo "Ansible not found. Please install Ansible on the server manually."
+            exit 1
+          else
+            echo "Ansible is already installed."
+          fi
+
+          # Proceed with your deployment
+          cd /home/ubuntu/pearlThoughts/ansible
+          ansible-playbook -i inventory.ini playbook.yml

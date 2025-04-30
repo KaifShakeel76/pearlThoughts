@@ -1,0 +1,11 @@
+- hosts: all
+  become: yes
+  vars:
+    docker_image: twinscom/yii2
+    service_name: yii2-app
+    server_name: test.pearlthoughts.com
+  roles:
+    - docker
+    - nginx
+    - deploy-app
+
