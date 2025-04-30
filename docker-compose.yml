@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  frontend:
+    image: kaifshakeel/yii2-frontend:latest  # Docker Hub image
+    ports:
+      - 20080:80
+    volumes:
+      - ~/.composer-docker/cache:/root/.composer/cache:delegated
+      - ./:/app
+    deploy:
+      replicas: 1  # Define number of replicas for load balancing
+      restart_policy:
+        condition: on-failure
+
+  backend:
+    image: kaifshakeel/yii2-backend:latest  # Docker Hub image
+    ports:
+      - 21080:80
+    volumes:
+      - ~/.composer-docker/cache:/root/.composer/cache:delegated
+      - ./:/app
+    deploy:
+      replicas: 1  # Define number of replicas for load balancing
+      restart_policy:
+        condition: on-failure
+
+  mysql:
+    image: mysql:5.7
+    environment:
+      - MYSQL_ROOT_PASSWORD=verysecret
+      - MYSQL_DATABASE=yii2advanced
+      - MYSQL_USER=yii2advanced
+      - MYSQL_PASSWORD=secret
+    deploy:
+      replicas: 1  # You typically need only 1 MySQL container
+      restart_policy:
+        condition: on-failure
+

@@ -1,0 +1,87 @@
+---
+- name: Deploy Yii2 Docker App using Docker Swarm
+  hosts: localhost
+  become: yes
+
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - git
+          - nginx
+        state: present
+        update_cache: yes
+
+    - name: Ensure Docker is running
+      service:
+        name: docker
+        state: started
+
+    - name: Leave existing Docker Swarm if any
+      shell: docker swarm leave --force || true
+
+    - name: Initialize Docker Swarm
+      shell: docker swarm init || true
+
+    - name: Remove old project if exists
+      file:
+        path: /home/ubuntu/yii2-advanced-test
+        state: absent
+
+    - name: Clone Yii2 app repo
+      git:
+        repo: https://github.com/yiisoft/yii2-app-advanced.git
+        dest: /home/ubuntu/yii2-advanced-test
+        version: master
+
+    - name: Deploy stack from repo
+      shell: docker stack deploy -c docker-compose.yml yii2app
+      args:
+        chdir: /home/ubuntu/yii2-advanced-test/
+
+    - name: Wait for backend container to be ready
+      pause:
+        seconds: 15
+
+    - name: Run composer install inside backend container
+      shell: docker exec $(docker ps -qf "name=yii2app_backend") composer install --no-interaction
+
+    - name: Run init script
+      shell: docker exec $(docker ps -qf "name=yii2app_backend") php /app/init --env=Development --overwrite=All
+
+    - name: Run Yii2 migrations
+      shell: docker exec $(docker ps -qf "name=yii2app_backend") php yii migrate --interactive=0
+
+    - name: Configure NGINX reverse proxy
+      copy:
+        dest: /etc/nginx/sites-available/yii2app
+        content: |
+          server {
+              listen 80;
+              location / {
+                  proxy_pass http://localhost:21080;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+          }
+
+    - name: Enable NGINX site
+      file:
+        src: /etc/nginx/sites-available/yii2app
+        dest: /etc/nginx/sites-enabled/yii2app
+        state: link
+        force: yes
+
+    - name: Remove default NGINX site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Test NGINX config
+      shell: nginx -t
+
+    - name: Restart NGINX
+      service:
+        name: nginx
+        state: restarted
+
