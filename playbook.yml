@@ -4,6 +4,7 @@
   become: yes
 
   tasks:
+    # Step 1: Install necessary packages
     - name: Install required packages
       apt:
         name:
@@ -17,41 +18,56 @@
         name: docker
         state: started
 
-    - name: Leave existing Docker Swarm if any
-      shell: docker swarm leave --force || true
-
-    - name: Initialize Docker Swarm
-      shell: docker swarm init || true
-
-    - name: Remove old project if exists
+    # Step 2: Clone the repo into a specific directory
+    - name: Remove existing repo if any
       file:
         path: /home/ubuntu/yii2-advanced-test
         state: absent
 
-    - name: Clone Yii2 app repo
+    - name: Clone the Yii2 repo
       git:
         repo: https://github.com/yiisoft/yii2-app-advanced.git
         dest: /home/ubuntu/yii2-advanced-test
         version: master
 
-    - name: Deploy stack from repo
+    # Step 3: Run commands in the repo folder
+    - name: Run composer install inside the backend container
+      shell: docker-compose run --rm backend composer install --no-interaction
+      args:
+        chdir: /home/ubuntu/yii2-advanced-test
+
+    - name: Initialize the application
+      shell: docker-compose run --rm backend php /app/init --env=Development --overwrite=All
+      args:
+        chdir: /home/ubuntu/yii2-advanced-test
+
+    - name: Copy DB Config
+      copy:
+        src: main-local.php.j2
+        dest: /home/ubuntu/yii2-advanced-test/common/config/main-local.php
+
+    - name: Deploy using docker-compose
+      shell: docker-compose up -d
+      args:
+        chdir: /home/ubuntu/yii2-advanced-test
+
+    - name: Run migrations
+      shell: docker-compose run --rm backend php yii migrate --interactive=0
+      args:
+        chdir: /home/ubuntu/yii2-advanced-test
+
+    # Step 4: Deploy services using docker-compose
+
+    # Step 5: Convert services to Docker Swarm
+    - name: Initialize Docker Swarm (if not already initialized)
+      shell: docker swarm init || true
+
+    - name: Deploy stack using Docker Swarm
       shell: docker stack deploy -c docker-compose.yml yii2app
       args:
-        chdir: /home/ubuntu/yii2-advanced-test/
+        chdir: /home/ubuntu/yii2-advanced-test
 
-    - name: Wait for backend container to be ready
-      pause:
-        seconds: 15
-
-    - name: Run composer install inside backend container
-      shell: docker exec $(docker ps -qf "name=yii2app_backend") composer install --no-interaction
-
-    - name: Run init script
-      shell: docker exec $(docker ps -qf "name=yii2app_backend") php /app/init --env=Development --overwrite=All
-
-    - name: Run Yii2 migrations
-      shell: docker exec $(docker ps -qf "name=yii2app_backend") php yii migrate --interactive=0
-
+    # Step 6: Ensure NGINX reverse proxy configuration
     - name: Configure NGINX reverse proxy
       copy:
         dest: /etc/nginx/sites-available/yii2app
