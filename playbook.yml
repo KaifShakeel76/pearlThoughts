@@ -11,7 +11,6 @@
           - git
           - nginx
         state: present
-        update_cache: yes
 
     - name: Ensure Docker is running
       service:
@@ -42,7 +41,7 @@
         chdir: /home/ubuntu/yii2-advanced-test
 
     - name: Copy DB Config
-      copy:
+      template:
         src: main-local.php.j2
         dest: /home/ubuntu/yii2-advanced-test/common/config/main-local.php
 
@@ -51,8 +50,18 @@
       args:
         chdir: /home/ubuntu/yii2-advanced-test
 
+    - name: Wait for MySQL to be ready
+      shell: docker-compose exec -T mysql bash -c 'mysqladmin ping -h "localhost" -u root -pverysecret'
+      args:
+        chdir: /home/ubuntu/yii2-advanced-test
+      register: mysql_ready
+      retries: 10
+      delay: 5
+      until: mysql_ready.rc == 0
+      ignore_errors: false
+
     - name: Run migrations
-      shell: docker-compose run --rm backend php yii migrate --interactive=0
+      shell: docker-compose run --rm backend yii migrate --interactive=0
       args:
         chdir: /home/ubuntu/yii2-advanced-test
 
@@ -62,6 +71,11 @@
     - name: Initialize Docker Swarm (if not already initialized)
       shell: docker swarm init || true
 
+    - name: Change Docker Compose
+      template:
+        src: docker-compose.yml.j2
+        dest: /home/ubuntu/yii2-advanced-test/docker-compose.yml
+
     - name: Deploy stack using Docker Swarm
       shell: docker stack deploy -c docker-compose.yml yii2app
       args:
@@ -69,17 +83,9 @@
 
     # Step 6: Ensure NGINX reverse proxy configuration
     - name: Configure NGINX reverse proxy
-      copy:
+      template:
+        src: yii2app.j2
         dest: /etc/nginx/sites-available/yii2app
-        content: |
-          server {
-              listen 80;
-              location / {
-                  proxy_pass http://localhost:21080;
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-              }
-          }
 
     - name: Enable NGINX site
       file:
